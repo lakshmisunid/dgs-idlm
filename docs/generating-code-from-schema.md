@@ -15,16 +15,16 @@ To apply the plugin, update your project’s `build.gradle` file to include the 
 ```groovy
 // Using plugins DSL
 plugins {
-	id "com.netflix.dgs.codegen" version "[REPLACE_WITH_CODEGEN_PLUGIN_VERSION]"
+    id "com.netflix.dgs.codegen" version "[REPLACE_WITH_CODEGEN_PLUGIN_VERSION]"
 }
 ```
 
 Alternatively, you can set up classpath dependencies in your buildscript:
 ```groovy
 buildscript {
-   dependencies{
-      classpath 'com.netflix.graphql.dgs.codegen:graphql-dgs-codegen-gradle:[REPLACE_WITH_CODEGEN_PLUGIN_VERSION]'
-   }
+    dependencies{
+        classpath 'com.netflix.graphql.dgs.codegen:graphql-dgs-codegen-gradle:[REPLACE_WITH_CODEGEN_PLUGIN_VERSION]'
+    }
 }
 
 apply plugin: 'com.netflix.dgs.codegen'
@@ -34,9 +34,9 @@ Next, you need to add the task configuration as shown here:
 
 ```groovy
 generateJava{
-   schemaPaths = ["${projectDir}/src/main/resources/schema"] // List of directories containing schema files
-   packageName = 'com.example.packagename' // The package name to use to generate sources
-   generateClient = true // Enable generating the type safe query API
+    schemaPaths = ["${projectDir}/src/main/resources/schema"] // List of directories containing schema files
+    packageName = 'com.example.packagename' // The package name to use to generate sources
+    generateClient = true // Enable generating the type safe query API
 }
 ```
 
@@ -73,7 +73,7 @@ For multi-module projects means you need to declare the Codegen plugin in the ro
 ```groovy
 plugins {
     id("com.netflix.dgs.codegen") version "[REPLACE_WITH_CODEGEN_PLUGIN_VERSION]" apply false
-    
+
     //other plugins
 }
 ```
@@ -102,7 +102,7 @@ The `typeMapping` configuration is a `Map` where each key is a GraphQL type and 
 
 ```groovy
 generateJava{
-   typeMapping = ["MyGraphQLType": "com.mypackage.MyJavaType"]
+    typeMapping = ["MyGraphQLType": "com.mypackage.MyJavaType"]
 }
 ```
 
@@ -123,20 +123,20 @@ The following is an example usage of a generated API:
 ```java
 GraphQLQueryRequest graphQLQueryRequest =
         new GraphQLQueryRequest(
-            new TicksGraphQLQuery.Builder()
-                .first(first)
-                .after(after)
-                .build(),
-            new TicksConnectionProjection()
-                .edges()
-                    .node()
-                        .date()
-                        .route()
-                            .name()
-                            .votes()
-                                .starRating()
-                                .parent()
-                            .grade());
+        new TicksGraphQLQuery.Builder()
+        .first(first)
+        .after(after)
+        .build(),
+        new TicksConnectionProjection()
+        .edges()
+        .node()
+        .date()
+        .route()
+        .name()
+        .votes()
+        .starRating()
+        .parent()
+        .grade());
 
 ```
 
@@ -230,30 +230,93 @@ Finally, `maxProjectionDepth` will instruct codegen to stop generating beyond 2 
 The default is 10.
 This will help further limit the number of projections as well.
 
+### Custom annotations
+This feature provides the ability to support any custom annotation on the generated POJOs using the @annotate directive in graphQL.
+The @annotate directive can be placed on type, input or fields in the graphQL. This feature is tured off as default and can be enabled by setting generateCustomAnnotation to true in pom for maven or build.gradle for gradle.
+```
+<generateCustomAnnotations>true</generateCustomAnnotations>
+```
+
+@annotate definition in the graphQL:
+```
+"Custom Annotation with optional type and parameters"
+directive @annotate(
+    name: String!
+    type: String = "AccountAnnotation"
+    inputs: JSON
+) repeatable on OBJECT | FIELD_DEFINITION | INPUT_OBJECT | INPUT_FIELD_DEFINITION
+```
+Some examples:
+```
+type Person @annotate(name: "ValidPerson", type: "validator", inputs: {types: [HUSBAND, WIFE]}) {
+       name: String @annotate(name: "com.test.anotherValidator.ValidName")
+       type: String @annotate(name: "ValidType", type: "personType", inputs: {types: [PRIMARY, SECONDARY]}) 
+}
+```
+The package mapping for the annotation and enums can be provided in the pom file for maven. The same configurations are available for gradle as well.
+```
+<includeImports>
+  <ValidPerson>com.test.validator</ValidPerson>
+</includeImports>
+<includeEnumImports>
+  <ValidPerson>
+    <types>com.enums</types>
+</ValidPerson>
+<ValidType>
+    <types>com.personType.enum</types>
+</ValidType>
+</includeEnumImports>
+```
+Generated POJO in kotlin. Please note that this feature is also available i n Java.
+```
+package com.netflix.graphql.dgs.codegen.tests.generated.types
+
+import com.fasterxml.jackson.`annotation`.JsonProperty
+import com.personType.enums.ValidType
+import com.test.anotherValidator.ValidName
+import com.test.validator.ValidPerson
+import kotlin.String
+
+@ValidPerson(types = [com.enums.HUSBAND, com.enums.WIFE])
+public data class Person(
+  @JsonProperty("name")
+  @ValidName
+  public val name: String? = null,
+  @JsonProperty("type")
+  @ValidType(types = [com.personType.enums.PRIMARY, com.personType.enums.SECONDARY])
+  public val type: String? = null,
+) {
+  public companion object
+}
+```
+
 # Configuring code generation
 
 Code generation has many configuration switches.
 The following table shows the Gradle configuration options, but the same options are available command line and in Maven as well.
 
-| Configuration property | Description | Default Value |
-| ------------- | ------------- | ----------- |
-| schemaPaths  | List of files/directories containing schemas | src/main/resources/schema |
-| packageName | Base package name of generated code | |
-| subPackageNameClient | Sub package name for generated Query API | client |
-| subPackageNameDatafetchers | Sub package name for generated data fetchers | datafetchers |
-| subPackageNameTypes | Sub package name for generated data types | types |
-| language | Either `java` or `kotlin` | Autodetected from project |
-| typeMapping | A Map where each key is a GraphQL type, and the value the FQN of a Java class |  |
-| generateBoxedTypes | Always use boxed types for primitives | false (boxed types are used only for nullable fields) |
-| generateClient | Generate a Query API | false |
-| generateDataTypes | Generate data types. Useful for only generating a Query API. Input types are still generated when `generateClient` is true. | true |
-| generateInterfaces | Generate interfaces for data classes. This is useful if you would like to extend the generated POJOs for more context and use interfaces instead of the data classes in your data fetchers. | false |
-| generatedSourcesDir | Build directory for Gradle | build |
-| outputDir | Sub directory of the `generatedSourcesDir` to generate into | generated |
-| exampleOutputDir | Directory to generate datafetcher example code to | generated-examples |
-| includeQueries | Generate Query API only for the given list of Query fields | All queries defined in schema |
-| includeMutations | Generate Query API only for the given list of Mutation fields | All mutations defined in schema |
-| includeSubscriptions | Generate Query API only for the given list of Subscription fields | All subscriptions defined in schema |
-| skipEntityQueries | Disable generating Entity queries for federated types | false |
-| shortProjectionNames | Shorten class names of projection types. These types are not visible to the developer. | false |
-| maxProjectionDepth | Maximum projection depth to generate. Useful for (federated) schemas with very deep nesting | 10 |
+| Configuration property     | Description                                                                                                                                                                                 | Default Value                                         |
+|----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------|
+| schemaPaths                | List of files/directories containing schemas                                                                                                                                                | src/main/resources/schema                             |
+| packageName                | Base package name of generated code                                                                                                                                                         |                                                       |
+| subPackageNameClient       | Sub package name for generated Query API                                                                                                                                                    | client                                                |
+| subPackageNameDatafetchers | Sub package name for generated data fetchers                                                                                                                                                | datafetchers                                          |
+| subPackageNameTypes        | Sub package name for generated data types                                                                                                                                                   | types                                                 |
+| language                   | Either `java` or `kotlin`                                                                                                                                                                   | Autodetected from project                             |
+| typeMapping                | A Map where each key is a GraphQL type, and the value the FQN of a Java class                                                                                                               |                                                       |
+| generateBoxedTypes         | Always use boxed types for primitives                                                                                                                                                       | false (boxed types are used only for nullable fields) |
+| generateClient             | Generate a Query API                                                                                                                                                                        | false                                                 |
+| generateDataTypes          | Generate data types. Useful for only generating a Query API. Input types are still generated when `generateClient` is true.                                                                 | true                                                  |
+| generateInterfaces         | Generate interfaces for data classes. This is useful if you would like to extend the generated POJOs for more context and use interfaces instead of the data classes in your data fetchers. | false                                                 |
+| generatedSourcesDir        | Build directory for Gradle                                                                                                                                                                  | build                                                 |
+| outputDir                  | Sub directory of the `generatedSourcesDir` to generate into                                                                                                                                 | generated                                             |
+| exampleOutputDir           | Directory to generate datafetcher example code to                                                                                                                                           | generated-examples                                    |
+| includeQueries             | Generate Query API only for the given list of Query fields                                                                                                                                  | All queries defined in schema                         |
+| includeMutations           | Generate Query API only for the given list of Mutation fields                                                                                                                               | All mutations defined in schema                       |
+| includeSubscriptions       | Generate Query API only for the given list of Subscription fields                                                                                                                           | All subscriptions defined in schema                   |
+| skipEntityQueries          | Disable generating Entity queries for federated types                                                                                                                                       | false                                                 |
+| shortProjectionNames       | Shorten class names of projection types. These types are not visible to the developer.                                                                                                      | false                                                 |
+| maxProjectionDepth         | Maximum projection depth to generate. Useful for (federated) schemas with very deep nesting                                                                                                 | 10                                                    |
+| includeImports             | Maps the custom annotation names to the package                                                                                                                                             |                                                       |
+| includeEnumImports         | Maps the custom annaotion and enum argument names to the enum packages                                                                                                                      |                                                       |
+| generateCustomAnnotations  | Enable/disable generation of custom annotation                                                                                                                                              | false                                                 | 
